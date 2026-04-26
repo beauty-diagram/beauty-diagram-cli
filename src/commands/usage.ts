@@ -9,7 +9,6 @@ type UsageResponse = {
   plan: string;
   actor: string;
   exports: { plan: string; used: number; limit: number | null; resetsAt: string };
-  ai: { used: number; limit: number | null; resetsAt: string | null };
 };
 
 export async function runUsageCommand(argv: string[]): Promise<number> {
@@ -25,9 +24,6 @@ export async function runUsageCommand(argv: string[]): Promise<number> {
   process.stdout.write(`plan: ${res.plan}\n`);
   process.stdout.write(
     `exports: ${res.exports.used} / ${res.exports.limit ?? "∞"}  (resets ${res.exports.resetsAt})\n`,
-  );
-  process.stdout.write(
-    `ai:      ${res.ai.used} / ${res.ai.limit ?? "n/a"}  (resets ${res.ai.resetsAt ?? "n/a"})\n`,
   );
   return 0;
 }
