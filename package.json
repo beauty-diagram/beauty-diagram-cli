@@ -1,0 +1,25 @@
+{
+  "name": "@beauty-diagram/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Beauty Diagram CLI — beautify, export, and share Mermaid / PlantUML diagrams from the command line.",
+  "bin": {
+    "bd": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
