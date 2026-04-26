@@ -118,8 +118,8 @@ Per-request privacy follows the API:
 ## Development
 
 ```bash
-cd packages/cli
-npm install --no-save typescript     # if not already in your global env
+cd beauty-diagram-cli
+npm install                          # one-time
 npm run build                        # tsc → dist/
 node dist/index.js help
 ```
