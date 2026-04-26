@@ -7,7 +7,7 @@ import path from "node:path";
 
 export function readSourceFromFileOrStdin(filePath?: string): string {
   if (filePath && filePath !== "-") {
-    return readFileSync(path.resolve(filePath), "utf8");
+    return normalizeSource(readFileSync(path.resolve(filePath), "utf8"));
   }
   // Read all of stdin synchronously. Acceptable: CLI input fits in memory.
   let buf = Buffer.alloc(0);
@@ -17,7 +17,15 @@ export function readSourceFromFileOrStdin(filePath?: string): string {
   } catch {
     // Fallback: empty
   }
-  return buf.toString("utf8");
+  return normalizeSource(buf.toString("utf8"));
+}
+
+// Editors on Windows / BOM-emitting tools leave a UTF-8 BOM at file start
+// and write CRLF line endings. Both reach Mermaid / PlantUML parsers as
+// part of node labels and silently make rendered text disappear.
+// Normalize at the file-read boundary so every CLI command is immune.
+function normalizeSource(text: string): string {
+  return text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
 }
 
 export function inferFormatFromPath(
