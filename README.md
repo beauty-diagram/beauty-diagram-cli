@@ -4,7 +4,7 @@ Beauty Diagram command-line interface — `bd`.
 
 Render Mermaid / PlantUML to presentation-ready SVG, share a public link, or run
 AI refinements straight from the terminal. Talks to the public API at
-`https://www.beautydiagram.com/api/v1/*` (or any URL you set via `--base-url`).
+`https://www.beauty-diagram.com/api/v1/*` (or any URL you set via `--base-url`).
 
 ## Install
 
@@ -43,7 +43,7 @@ bd beautify flow.mmd --api-key bd_live_... --out flow.svg
 bd auth status
 ```
 
-Create keys at [`/account/api-keys`](https://www.beautydiagram.com/account/api-keys).
+Create keys at [`/account/api-keys`](https://www.beauty-diagram.com/account/api-keys).
 Pick the smallest scope set that covers your workflow.
 
 ## Commands
@@ -51,19 +51,22 @@ Pick the smallest scope set that covers your workflow.
 ```bash
 bd themes
 bd beautify flow.mmd [--theme modern] [--out flow.svg]
-bd export   flow.mmd [--theme modern] [--format svg] [--out flow.svg]
+bd export   flow.mmd [--theme modern] [--format svg|png] [--scale 1|2|4] [--out flow.svg]
 bd share    flow.mmd [--title "Release flow"] [--theme modern]
 bd usage
 ```
 
-PNG export is on the roadmap. Until it ships, `bd export --format png`
-returns a `not_yet_supported` error from the API.
+`bd export --format png --scale 4` requests a 4x PNG. The server caps the
+effective scale by plan tier (anonymous / free = 1x, pro = 2x, premium = 4x);
+when clamping happens the CLI prints a one-line note pointing at the upgrade
+path. CJK labels in PNGs render as tofu boxes today — use `--format svg` for
+diagrams with Chinese / Japanese / Korean text.
 
 ### File handling
 
 - Pass `-` or omit `<file>` to read source from stdin.
-- Pass `--out -` to write to stdout instead of a file.
-- File-extension hints set the format: `.mmd`/`.mermaid` → mermaid, `.puml`/`.plantuml`/`.pu` → plantuml. Override with `--format mermaid|plantuml`.
+- Pass `--out -` to write to stdout (binary bytes for PNG; safe to redirect to a file).
+- File-extension hints set the source format: `.mmd`/`.mermaid` → mermaid, `.puml`/`.plantuml`/`.pu` → plantuml. Override with `--source-format mermaid|plantuml`.
 
 ### Agent-friendly examples
 
@@ -86,7 +89,7 @@ For each request, the CLI resolves the API key in this order:
 4. None — falls through to anonymous demo
 
 The base URL follows the same precedence with `--base-url` /
-`BEAUTY_DIAGRAM_API_BASE_URL` / saved / `https://www.beautydiagram.com`.
+`BEAUTY_DIAGRAM_API_BASE_URL` / saved / `https://www.beauty-diagram.com`.
 
 ## Errors
 
@@ -101,7 +104,8 @@ plus message to stderr. Common codes:
 | `parse_failed` | Source did not parse as the declared format. |
 | `quota_exhausted` | Plan limit reached for this period. |
 | `rate_limited` | Anonymous IP bucket is full — wait or sign in. |
-| `not_yet_supported` | Endpoint or option ships in a later phase (PNG export today). |
+| `output_too_large` | Rasterized PNG exceeds the 8192 px ceiling. Lower `--scale` or simplify the diagram. |
+| `not_yet_supported` | Reserved for endpoints that ship in later phases. |
 
 ## Privacy
 

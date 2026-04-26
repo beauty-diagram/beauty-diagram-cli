@@ -46,3 +46,19 @@ export function writeOutput(contents: string, outPath: string | undefined): void
   }
   writeFileAtomic(outPath, contents);
 }
+
+export function writeBinaryOutput(
+  bytes: Uint8Array,
+  outPath: string | undefined,
+): void {
+  if (!outPath || outPath === "-") {
+    // Raw bytes to stdout — gibberish in a terminal but `bd export ... > flow.png`
+    // pipelines work correctly.
+    process.stdout.write(bytes);
+    return;
+  }
+  const resolved = path.resolve(outPath);
+  const tmp = `${resolved}.tmp.${process.pid}.${Date.now()}`;
+  writeFileSync(tmp, bytes);
+  renameSync(tmp, resolved);
+}

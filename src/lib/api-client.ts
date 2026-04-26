@@ -47,45 +47,68 @@ export class ApiClient {
   }
 
   /**
-   * POST and read the response as a binary download (text body + headers).
-   * Used by `/api/v1/export` which returns `Content-Type: image/svg+xml`.
-   * On non-2xx, the server still answers JSON; we surface that error shape.
+   * POST and read the response as a UTF-8 text download (body + headers).
+   * Used by `/api/v1/export?format=svg` which returns
+   * `Content-Type: image/svg+xml`. On non-2xx the server still answers JSON;
+   * we surface that as an `ApiError`.
    */
   async postRaw(
     path: string,
     body: unknown,
   ): Promise<{ body: string; headers: Record<string, string>; status: number }> {
+    const res = await this.postExpectingDownload(path, body, "image/svg+xml,*/*");
+    const text = await res.text();
+    return { body: text, headers: extractHeaders(res), status: res.status };
+  }
+
+  /**
+   * POST and read the response as binary bytes. Used by
+   * `/api/v1/export?format=png` which returns `Content-Type: image/png`.
+   */
+  async postBinary(
+    path: string,
+    body: unknown,
+    accept = "image/png,*/*",
+  ): Promise<{ body: Uint8Array; headers: Record<string, string>; status: number }> {
+    const res = await this.postExpectingDownload(path, body, accept);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return { body: buf, headers: extractHeaders(res), status: res.status };
+  }
+
+  private async postExpectingDownload(
+    path: string,
+    body: unknown,
+    accept: string,
+  ): Promise<Response> {
     const res = await fetch(this.buildUrl(path), {
       method: "POST",
-      headers: this.headers({
-        "content-type": "application/json",
-        accept: "image/svg+xml,*/*",
-      }),
+      headers: this.headers({ "content-type": "application/json", accept }),
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      // Server emits JSON error even when caller asked for binary.
-      let parsed: unknown = null;
-      try {
-        parsed = await res.json();
-      } catch {
-        // empty / non-json
-      }
-      const obj = (parsed ?? {}) as { error?: string; message?: string };
-      const err: ApiError = {
-        status: res.status,
-        code: obj.error ?? "http_error",
-        message: obj.message ?? `HTTP ${res.status}`,
-      };
-      throw Object.assign(new Error(`${err.code}: ${err.message}`), { apiError: err });
+    if (res.ok) return res;
+    // Server emits JSON error even when caller asked for binary.
+    let parsed: unknown = null;
+    try {
+      parsed = await res.json();
+    } catch {
+      // empty / non-json
     }
-    const text = await res.text();
-    const headers: Record<string, string> = {};
-    res.headers.forEach((v, k) => {
-      headers[k.toLowerCase()] = v;
-    });
-    return { body: text, headers, status: res.status };
+    const obj = (parsed ?? {}) as { error?: string; message?: string };
+    const err: ApiError = {
+      status: res.status,
+      code: obj.error ?? "http_error",
+      message: obj.message ?? `HTTP ${res.status}`,
+    };
+    throw Object.assign(new Error(`${err.code}: ${err.message}`), { apiError: err });
   }
+}
+
+function extractHeaders(res: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  res.headers.forEach((v, k) => {
+    headers[k.toLowerCase()] = v;
+  });
+  return headers;
 }
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {

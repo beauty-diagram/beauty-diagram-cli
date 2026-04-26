@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "
 import { homedir, platform } from "node:os";
 import path from "node:path";
 
-export const DEFAULT_BASE_URL = "https://www.beautydiagram.com";
+export const DEFAULT_BASE_URL = "https://www.beauty-diagram.com";
 
 export type CliConfig = {
   apiKey?: string;
