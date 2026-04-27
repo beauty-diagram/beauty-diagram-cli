@@ -7,7 +7,30 @@ export type ApiError = {
   status: number;
   code: string;
   message: string;
+  signUpUrl?: string;
+  upgradeUrl?: string;
 };
+
+function pickString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function extractApiError(parsed: unknown, status: number): ApiError {
+  const obj = (parsed ?? {}) as {
+    error?: string;
+    message?: string;
+    hints?: { signUpUrl?: unknown; upgradeUrl?: unknown };
+  };
+  const signUpUrl = pickString(obj.hints?.signUpUrl);
+  const upgradeUrl = pickString(obj.hints?.upgradeUrl);
+  return {
+    status,
+    code: obj.error ?? "http_error",
+    message: obj.message ?? `HTTP ${status}`,
+    ...(signUpUrl ? { signUpUrl } : {}),
+    ...(upgradeUrl ? { upgradeUrl } : {}),
+  };
+}
 
 export class ApiClient {
   constructor(
@@ -93,12 +116,7 @@ export class ApiClient {
     } catch {
       // empty / non-json
     }
-    const obj = (parsed ?? {}) as { error?: string; message?: string };
-    const err: ApiError = {
-      status: res.status,
-      code: obj.error ?? "http_error",
-      message: obj.message ?? `HTTP ${res.status}`,
-    };
+    const err = extractApiError(parsed, res.status);
     throw Object.assign(new Error(`${err.code}: ${err.message}`), { apiError: err });
   }
 }
@@ -119,12 +137,7 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
     // empty body or non-json
   }
   if (!res.ok) {
-    const obj = (parsed ?? {}) as { error?: string; message?: string };
-    const err: ApiError = {
-      status: res.status,
-      code: obj.error ?? "http_error",
-      message: obj.message ?? `HTTP ${res.status}`,
-    };
+    const err = extractApiError(parsed, res.status);
     throw Object.assign(new Error(`${err.code}: ${err.message}`), { apiError: err });
   }
   return parsed as T;

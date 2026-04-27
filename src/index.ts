@@ -84,6 +84,12 @@ main(process.argv.slice(2))
     if (isApiError(err)) {
       process.stderr.write(`error: ${err.apiError.code} (HTTP ${err.apiError.status})\n`);
       process.stderr.write(`  ${err.apiError.message}\n`);
+      if (err.apiError.signUpUrl) {
+        process.stderr.write(`  Sign up: ${err.apiError.signUpUrl}\n`);
+      }
+      if (err.apiError.upgradeUrl) {
+        process.stderr.write(`  Upgrade: ${err.apiError.upgradeUrl}\n`);
+      }
     } else if (err instanceof Error) {
       process.stderr.write(`error: ${err.message}\n`);
     } else {
