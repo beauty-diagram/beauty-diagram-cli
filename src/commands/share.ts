@@ -20,9 +20,11 @@ export async function runShareCommand(argv: string[]): Promise<number> {
   const file = parsed.positional[0];
   const cfg = resolveConfig(getStringFlag(parsed, "api-key"), getStringFlag(parsed, "base-url"));
   if (!cfg.apiKey) {
+    const signUpUrl = new URL("/auth/signup", cfg.baseUrl).toString();
     process.stderr.write(
       "error: `bd share` requires an API key. Run `bd auth login` first.\n",
     );
+    process.stderr.write(`  Sign up: ${signUpUrl}\n`);
     return 1;
   }
   const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
