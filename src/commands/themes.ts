@@ -13,7 +13,7 @@ export async function runThemesCommand(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   const cfg = resolveConfig(getStringFlag(parsed, "api-key"), getStringFlag(parsed, "base-url"));
   const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
-  const result = await client.getJson<ThemesResponse>("/api/v1/themes");
+  const result = await client.getJson<ThemesResponse>("/v1/themes");
 
   for (const t of result.themes) {
     const desc = t.description ? ` — ${t.description}` : "";

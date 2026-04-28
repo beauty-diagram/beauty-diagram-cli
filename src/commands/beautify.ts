@@ -33,7 +33,7 @@ export async function runBeautifyCommand(argv: string[]): Promise<number> {
   const theme = getStringFlag(parsed, "theme");
   const out = getStringFlag(parsed, "out");
 
-  const res = await client.postJson<BeautifyResponse>("/api/v1/beautify", {
+  const res = await client.postJson<BeautifyResponse>("/v1/beautify", {
     source,
     sourceFormat,
     ...(theme ? { theme } : {}),

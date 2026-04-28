@@ -1,6 +1,6 @@
 {
   "name": "@beauty-diagram/cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": false,
   "description": "Beauty Diagram CLI — beautify, export, and share Mermaid / PlantUML diagrams from the command line.",
   "bin": {

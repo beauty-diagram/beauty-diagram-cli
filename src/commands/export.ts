@@ -1,6 +1,6 @@
 // packages/cli/src/commands/export.ts
 //
-// `bd export` — POSTs to /api/v1/export and writes the resulting file.
+// `bd export` — POSTs to /v1/export and writes the resulting file.
 //
 // Output format is selected with `--format svg|png` (default svg) and
 // matches the README. The source format is auto-detected from the file
@@ -73,13 +73,13 @@ export async function runExportCommand(argv: string[]): Promise<number> {
   };
 
   if (fmt === "svg") {
-    const { body, headers } = await client.postRaw("/api/v1/export", requestBody);
+    const { body, headers } = await client.postRaw("/v1/export", requestBody);
     writeOutput(body, out);
     printSummary(headers, "svg");
     return 0;
   }
 
-  const { body, headers } = await client.postBinary("/api/v1/export", requestBody);
+  const { body, headers } = await client.postBinary("/v1/export", requestBody);
   writeBinaryOutput(body, out);
   printSummary(headers, "png");
   return 0;

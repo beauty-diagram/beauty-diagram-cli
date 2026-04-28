@@ -19,7 +19,7 @@ export async function runUsageCommand(argv: string[]): Promise<number> {
     return 1;
   }
   const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
-  const res = await client.getJson<UsageResponse>("/api/v1/usage");
+  const res = await client.getJson<UsageResponse>("/v1/usage");
 
   process.stdout.write(`plan: ${res.plan}\n`);
   process.stdout.write(

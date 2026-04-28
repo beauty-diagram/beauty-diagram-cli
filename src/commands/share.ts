@@ -34,7 +34,7 @@ export async function runShareCommand(argv: string[]): Promise<number> {
   const title = getStringFlag(parsed, "title");
   const theme = getStringFlag(parsed, "theme");
 
-  const res = await client.postJson<ShareResponse>("/api/v1/share", {
+  const res = await client.postJson<ShareResponse>("/v1/share", {
     source,
     sourceFormat,
     ...(title ? { title } : {}),

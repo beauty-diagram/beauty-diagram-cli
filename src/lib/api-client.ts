@@ -71,7 +71,7 @@ export class ApiClient {
 
   /**
    * POST and read the response as a UTF-8 text download (body + headers).
-   * Used by `/api/v1/export?format=svg` which returns
+   * Used by `/v1/export?format=svg` which returns
    * `Content-Type: image/svg+xml`. On non-2xx the server still answers JSON;
    * we surface that as an `ApiError`.
    */
@@ -86,7 +86,7 @@ export class ApiClient {
 
   /**
    * POST and read the response as binary bytes. Used by
-   * `/api/v1/export?format=png` which returns `Content-Type: image/png`.
+   * `/v1/export?format=png` which returns `Content-Type: image/png`.
    */
   async postBinary(
     path: string,
