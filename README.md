@@ -4,7 +4,7 @@ Beauty Diagram command-line interface — `bd`.
 
 Render Mermaid / PlantUML to presentation-ready SVG, share a public link, or run
 AI refinements straight from the terminal. Talks to the public API at
-`https://www.beauty-diagram.com/api/v1/*` (or any URL you set via `--base-url`).
+`https://api.beauty-diagram.com/v1/*` (or any URL you set via `--base-url`).
 
 ## Install
 
@@ -89,7 +89,7 @@ For each request, the CLI resolves the API key in this order:
 4. None — falls through to anonymous demo
 
 The base URL follows the same precedence with `--base-url` /
-`BEAUTY_DIAGRAM_API_BASE_URL` / saved / `https://www.beauty-diagram.com`.
+`BEAUTY_DIAGRAM_API_BASE_URL` / saved / `https://api.beauty-diagram.com`.
 
 ## Errors
 

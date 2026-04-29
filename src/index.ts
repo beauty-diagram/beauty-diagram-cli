@@ -35,7 +35,7 @@ Commands:
 
 Global flags:
   --api-key KEY                    Override BEAUTY_DIAGRAM_API_KEY
-  --base-url URL                   Override default https://beauty-diagram.com
+  --base-url URL                   Override default https://api.beauty-diagram.com
 
 Files:
   Pass "-" or omit <file> to read from stdin.
