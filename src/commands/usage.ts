@@ -9,6 +9,14 @@ type UsageResponse = {
   plan: string;
   actor: string;
   exports: { plan: string; used: number; limit: number | null; resetsAt: string };
+  // Older servers won't include `ai`. Treat absent as "feature not exposed",
+  // not "no quota" — printing the block would mislead.
+  ai?: {
+    enabled: boolean;
+    limit: number | null;
+    used: number;
+    resetsAt: string | null;
+  };
 };
 
 export async function runUsageCommand(argv: string[]): Promise<number> {
@@ -25,5 +33,14 @@ export async function runUsageCommand(argv: string[]): Promise<number> {
   process.stdout.write(
     `exports: ${res.exports.used} / ${res.exports.limit ?? "∞"}  (resets ${res.exports.resetsAt})\n`,
   );
+  if (res.ai) {
+    if (res.ai.enabled) {
+      const limit = res.ai.limit ?? "∞";
+      const reset = res.ai.resetsAt ? `  (resets ${res.ai.resetsAt})` : "";
+      process.stdout.write(`ai:      ${res.ai.used} / ${limit}${reset}\n`);
+    } else {
+      process.stdout.write(`ai:      not available on plan '${res.plan}'\n`);
+    }
+  }
   return 0;
 }

@@ -9,6 +9,7 @@
 //   - The CLI is a *thin client*: never imports from beauty-diagram-engine.
 //     If a workflow needs the engine, it goes via /v1/*.
 
+import { runAiCommand } from "./commands/ai.js";
 import { runAuthCommand } from "./commands/auth.js";
 import { runBeautifyCommand } from "./commands/beautify.js";
 import { runExportCommand } from "./commands/export.js";
@@ -30,7 +31,9 @@ Commands:
   beautify <file> [--theme T] [--out O] [--format mermaid|plantuml]
   export   <file> [--theme T] [--format svg|png] [--out O]
   share    <file> [--title T] [--theme T]
-  usage                            Show plan and export counter
+  ai generate "<prompt>" [--out O] [--hint H]
+                                   Generate Mermaid source via AI (paid plans only)
+  usage                            Show plan, export and AI counters
   help                             Show this help
 
 Global flags:
@@ -69,6 +72,8 @@ async function main(argv: string[]): Promise<number> {
       return runShareCommand(rest);
     case "usage":
       return runUsageCommand(rest);
+    case "ai":
+      return runAiCommand(rest);
     default:
       process.stderr.write(`Unknown command: ${command}\n\n`);
       process.stderr.write(HELP);
