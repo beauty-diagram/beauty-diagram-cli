@@ -41,12 +41,30 @@ export async function runShareCommand(argv: string[]): Promise<number> {
     ...(theme ? { theme } : {}),
   });
 
-  // Resolve the share URL relative to the configured base URL.
-  const fullUrl = res.shareUrl.startsWith("http")
+  // Resolve the share URL relative to the configured base URL, then validate
+  // it before printing. A compromised or misconfigured server could otherwise
+  // return `javascript:` / `data:` / `file:` URLs that would be dangerous to
+  // paste into a browser or chat client. We only print real http(s) URLs.
+  const rawUrl = res.shareUrl.startsWith("http")
     ? res.shareUrl
     : `${cfg.baseUrl.replace(/\/+$/, "")}${res.shareUrl}`;
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    process.stderr.write(
+      `error: server returned an invalid share URL: ${rawUrl}\n`,
+    );
+    return 1;
+  }
+  if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+    process.stderr.write(
+      `error: server returned a share URL with unsupported protocol '${parsedUrl.protocol}': ${rawUrl}\n`,
+    );
+    return 1;
+  }
 
-  process.stdout.write(`${fullUrl}\n`);
+  process.stdout.write(`${parsedUrl.toString()}\n`);
   process.stderr.write(`✓ shared (${res.diagramType})\n`);
   return 0;
 }

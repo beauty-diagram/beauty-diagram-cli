@@ -2,6 +2,13 @@
 //
 // Tiny HTTP client over `fetch`. We avoid pulling in axios/got etc. — the
 // product is "render a diagram", not "compose 12 different SDKs".
+//
+// Every outbound request opts out of redirect following (`redirect: "error"`).
+// The CLI sends a Bearer token in `Authorization`, and Node's default
+// `redirect: "follow"` would forward that header to whatever host the redirect
+// points at. That's an API key exfil channel if the configured base URL is
+// ever pointed at (or hijacked into) an attacker-controlled origin. The API
+// itself does not legitimately need redirects — pin to the origin we resolved.
 
 export type ApiError = {
   status: number;
@@ -56,6 +63,7 @@ export class ApiClient {
     const res = await fetch(this.buildUrl(path), {
       method: "GET",
       headers: this.headers(),
+      redirect: "error",
     });
     return parseJsonResponse<T>(res);
   }
@@ -65,6 +73,7 @@ export class ApiClient {
       method: "POST",
       headers: this.headers({ "content-type": "application/json" }),
       body: JSON.stringify(body),
+      redirect: "error",
     });
     return parseJsonResponse<T>(res);
   }
@@ -107,6 +116,7 @@ export class ApiClient {
       method: "POST",
       headers: this.headers({ "content-type": "application/json", accept }),
       body: JSON.stringify(body),
+      redirect: "error",
     });
     if (res.ok) return res;
     // Server emits JSON error even when caller asked for binary.

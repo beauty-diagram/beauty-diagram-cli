@@ -2,12 +2,47 @@
 //
 // File / stdin / stdout helpers used by the CLI commands.
 
-import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { lstatSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import path from "node:path";
+
+export class UnsafePathError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnsafePathError";
+  }
+}
+
+/**
+ * Reject paths that resolve through a symlink. The CLI uploads file contents
+ * to the Beauty Diagram API, so following a symlink would let an attacker on
+ * a shared box (or a confused build pipeline) trick the user into uploading
+ * sensitive files (e.g. `~/.ssh/id_rsa`) by luring them with a benign-looking
+ * `.mmd` path. We do a single-level lstat on the resolved path; deeper
+ * traversal is not needed because an attacker who can plant a symlink
+ * anywhere on the path can also just put the symlink at the leaf.
+ */
+function assertNotSymlink(resolvedPath: string): void {
+  let stat;
+  try {
+    stat = lstatSync(resolvedPath);
+  } catch {
+    // Let the actual read surface ENOENT with the real path — keeping the
+    // error message close to what the user typed is more helpful than a
+    // generic "unsafe path".
+    return;
+  }
+  if (stat.isSymbolicLink()) {
+    throw new UnsafePathError(
+      `refusing to read through a symbolic link: ${resolvedPath}`,
+    );
+  }
+}
 
 export function readSourceFromFileOrStdin(filePath?: string): string {
   if (filePath && filePath !== "-") {
-    return normalizeSource(readFileSync(path.resolve(filePath), "utf8"));
+    const resolved = path.resolve(filePath);
+    assertNotSymlink(resolved);
+    return normalizeSource(readFileSync(resolved, "utf8"));
   }
   // Read all of stdin synchronously. Acceptable: CLI input fits in memory.
   let buf = Buffer.alloc(0);
