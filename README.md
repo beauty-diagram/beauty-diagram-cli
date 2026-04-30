@@ -53,6 +53,7 @@ bd themes
 bd beautify flow.mmd [--theme modern] [--out flow.svg]
 bd export   flow.mmd [--theme modern] [--format svg|png] [--scale 1|2|4] [--out flow.svg]
 bd share    flow.mmd [--title "Release flow"] [--theme modern]
+bd ai generate "<prompt>" [--hint flowchart|sequence|...] [--out flow.mmd]
 bd usage
 ```
 
@@ -99,7 +100,7 @@ plus message to stderr. Common codes:
 | Code | Meaning |
 |---|---|
 | `not_authenticated` | No key, no session — sign in or use `bd auth login`. |
-| `scope_missing` | Key lacks the scope the endpoint needs (e.g. `ai:write` for `bd refine`). |
+| `scope_missing` | Key lacks the scope the endpoint needs (e.g. `ai:write` for `bd ai generate`). Recreate the key with the missing scope. |
 | `plan_not_allowed` | Plan does not include this capability. |
 | `parse_failed` | Source did not parse as the declared format. |
 | `quota_exhausted` | Plan limit reached for this period. |
