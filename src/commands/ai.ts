@@ -107,7 +107,6 @@ async function runAiGenerate(argv: string[]): Promise<number> {
     "/v1/ai/generate",
     {
       prompt,
-      source: "cli",
       ...(hint ? { hint } : {}),
     },
   );
