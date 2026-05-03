@@ -52,6 +52,8 @@ Pick the smallest scope set that covers your workflow.
 bd themes
 bd beautify flow.mmd [--theme modern] [--out flow.svg]
 bd export   flow.mmd [--theme modern] [--format svg|png] [--scale 1|2|4] [--out flow.svg]
+bd batch    <paths...>     [--out-dir DIR] [--format svg|png] [--concurrency N] [--stop-on-error]
+bd extract  <markdown...>  [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
 bd share    flow.mmd [--title "Release flow"] [--theme modern]
 bd ai generate "<prompt>" [--hint flowchart|sequence|...] [--out flow.mmd]
 bd usage
@@ -82,38 +84,48 @@ echo "Diagram: $url"
 
 ## Batch render
 
-Render every diagram in a directory in parallel:
+Render many diagrams in parallel — one `/v1/export` request per file.
 
 ```bash
-bd batch ./diagrams --out-dir ./svg
-bd batch "docs/**/*.mmd" --format png --concurrency 8
+bd batch ./diagrams                          # recurse a directory
+bd batch ./diagrams --out-dir ./svg          # write SVGs to ./svg/, preserving relative paths
+bd batch a.mmd b.puml                        # explicit files
+bd batch "diagrams/*.mmd" --format png       # single-segment glob (quote it)
+bd batch ./d --concurrency 8 --theme neon
+bd batch ./d --stop-on-error                 # abort on first failure (default: continue)
 ```
 
-Each file becomes one `/v1/export` request — failures are reported per-file
-and the whole batch keeps going (use `--stop-on-error` to abort on the first
-failure). The source folder layout is preserved under `--out-dir`.
+- Recurses directories looking for `.mmd`, `.puml`, `.plantuml`, `.pu`. Other files are ignored unless listed explicitly.
+- Default concurrency is `4`. Each file becomes one independent request, so quota / rate limits behave the same as `bd export`.
+- Default failure mode is **continue-on-error**: a per-file `✗` line is printed, the rest of the batch finishes, and the command exits `1` if any file failed.
+- `--out-dir` must resolve inside the current working directory — paths that escape (e.g. `--out-dir ../../tmp`) are rejected for safety.
 
 ## Embed diagrams in Markdown
 
 `bd extract` finds every ```` ```mermaid ```` / ```` ```plantuml ```` fenced
-block in your Markdown files, renders them to sidecar SVGs, and injects an
-image reference just below each block. Re-running is idempotent —
+block in your Markdown files, renders each to a sidecar SVG, and injects an
+image reference just below the block. Re-running is **idempotent** —
 content-hashed filenames mean unchanged blocks are skipped.
 
 ```bash
 bd extract README.md
 bd extract docs/*.md --assets-dir ./img --concurrency 4
 bd extract README.md --dry-run        # preview without writing
-bd extract README.md --clean          # also delete orphaned SVGs
+bd extract README.md --clean          # also delete orphaned SVGs left from old hashes
 ```
 
-The injected block looks like this and is re-recognized on subsequent runs:
+The injected block looks like this and is recognized on subsequent runs:
 
 ```
 <!-- bd:img hash=a3f9c2b1 -->
 ![Diagram 1](./assets/readme-a3f9c2b1.svg)
 <!-- /bd:img -->
 ```
+
+- Markdown files with no diagram blocks are reported and skipped (exit 0).
+- `--assets-dir` defaults to `./assets/` next to the Markdown file. It must resolve inside either the Markdown's directory or the cwd — paths that escape are rejected.
+- If a single block fails to render, sidecar SVGs already written for that document in the same run are cleaned up so the Markdown is never left half-injected.
+- Why sidecar files instead of inline `<svg>`? GitHub, GitLab, and most static-site renderers strip raw `<svg>` from Markdown for safety, so the only reliable embed is `![](path)`.
 
 ## Configuration precedence
 
