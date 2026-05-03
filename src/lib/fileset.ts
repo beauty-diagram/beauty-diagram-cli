@@ -8,7 +8,7 @@
 // shell already expands globs for `bd batch *.mmd`; this fallback exists for
 // quoted patterns like `bd batch "diagrams/*.mmd"` and Windows shells.
 
-import { readdirSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 export const DIAGRAM_EXTENSIONS = [".mmd", ".puml", ".plantuml", ".pu"] as const;
@@ -50,8 +50,13 @@ function walkDir(dir: string): string[] {
   }
   for (const name of entries) {
     const full = path.join(dir, name);
+    // Use lstatSync (not statSync) so we skip symlinks rather than following
+    // them. The CLI rejects symlinked diagram sources at read-time for safety
+    // (see io.ts assertNotSymlink); silently dropping them at walk-time keeps
+    // batch runs predictable instead of failing on the first symlinked entry.
     let st;
-    try { st = statSync(full); } catch { continue; }
+    try { st = lstatSync(full); } catch { continue; }
+    if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) {
       out.push(...walkDir(full));
     } else if (st.isFile()) {

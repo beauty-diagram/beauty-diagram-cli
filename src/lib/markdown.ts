@@ -30,6 +30,10 @@ export type RenderedImage = {
   alt: string;
 };
 
+// The trailing `[^\n]*` after the language captures the CommonMark "info
+// string" tail (e.g. ` ```mermaid title=foo `). We accept and ignore it —
+// fence-info attributes are renderer-specific and not relevant to which
+// blocks we treat as diagrams. Only the first word (the language) matters.
 const OPEN_FENCE_RE = /^( {0,3})(```+|~~~+)\s*([A-Za-z][\w-]*)\s*([^\n]*)$/;
 
 export function parseDiagramBlocks(text: string): DiagramBlock[] {

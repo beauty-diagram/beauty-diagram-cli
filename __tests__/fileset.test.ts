@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expandDiagramPaths, DIAGRAM_EXTENSIONS } from "../src/lib/fileset.js";
@@ -45,5 +45,21 @@ describe("expandDiagramPaths", () => {
 
   it("exposes the diagram extension list", () => {
     expect(DIAGRAM_EXTENSIONS).toEqual([".mmd", ".puml", ".plantuml", ".pu"]);
+  });
+
+  it("skips symlinked entries when walking a directory", () => {
+    const linkDir = mkdtempSync(path.join(tmpdir(), "bd-fileset-link-"));
+    try {
+      const realFile = path.join(dir, "a.mmd");
+      const link = path.join(linkDir, "linked.mmd");
+      symlinkSync(realFile, link);
+      // Also create a real file so the directory isn't empty.
+      writeFileSync(path.join(linkDir, "real.mmd"), "graph TD\nX-->Y");
+      const result = expandDiagramPaths([linkDir]).sort();
+      expect(result).toEqual([path.join(linkDir, "real.mmd")]);
+      expect(result).not.toContain(link);
+    } finally {
+      rmSync(linkDir, { recursive: true, force: true });
+    }
   });
 });

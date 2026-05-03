@@ -32,7 +32,10 @@ function slugify(name: string): string {
 }
 
 function altFromBlock(block: DiagramBlock, index: number): string {
-  const titleMatch = /(?:^|\n)\s*(?:title|%%\s*title:?)\s*([^\n]+)/i.exec(block.source);
+  // Anchor to start-of-line (with `m` flag) so we don't accidentally pick up
+  // `title` inside a node label like `A[Page title]`. Matches Mermaid's
+  // top-level `title` directive and PlantUML's `%% title:` style.
+  const titleMatch = /^\s*(?:title|%%\s*title:?)\s+([^\n]+)/im.exec(block.source);
   if (titleMatch) return titleMatch[1]!.trim().slice(0, 80);
   return `Diagram ${index + 1}`;
 }
