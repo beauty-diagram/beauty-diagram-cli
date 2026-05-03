@@ -12,6 +12,16 @@ export type PMapOpts = {
   continueOnError?: boolean;
 };
 
+export function pMap<I, O>(
+  items: readonly I[],
+  fn: (item: I, index: number) => Promise<O>,
+  opts: PMapOpts & { continueOnError: true },
+): Promise<PMapResult<O>[]>;
+export function pMap<I, O>(
+  items: readonly I[],
+  fn: (item: I, index: number) => Promise<O>,
+  opts: PMapOpts & { continueOnError?: false },
+): Promise<O[]>;
 export async function pMap<I, O>(
   items: readonly I[],
   fn: (item: I, index: number) => Promise<O>,

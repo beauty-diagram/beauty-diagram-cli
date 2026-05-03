@@ -95,44 +95,42 @@ export async function runBatchCommand(argv: string[]): Promise<number> {
   }
   process.stderr.write(`bd batch: ${files.length} file(s), concurrency=${concurrency}\n`);
 
-  const results = await pMap(
-    files,
-    async (file) => {
-      const source = readDiagramFile(file);
-      const sourceFormat = inferFormatFromPath(file, undefined);
-      const result = await exportOne(client, {
-        source,
-        sourceFormat,
-        format: fmt,
-        ...(theme ? { theme } : {}),
-      });
-      const outPath = deriveOutputPath(file, outDir, fmt);
-      mkdirSync(path.dirname(outPath), { recursive: true });
-      if (result.format === "svg") {
-        writeFileAtomic(outPath, result.text!);
-      } else {
-        writeBinaryFileAtomic(outPath, result.bytes!);
-      }
-      process.stderr.write(`${formatExportSummary(result, file)} → ${outPath}\n`);
-      return outPath;
-    },
-    { concurrency, continueOnError: !stopOnError },
-  );
+  const renderOne = async (file: string): Promise<string> => {
+    const source = readDiagramFile(file);
+    const sourceFormat = inferFormatFromPath(file, undefined);
+    const result = await exportOne(client, {
+      source,
+      sourceFormat,
+      format: fmt,
+      ...(theme ? { theme } : {}),
+    });
+    const outPath = deriveOutputPath(file, outDir, fmt);
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    if (result.format === "svg") {
+      writeFileAtomic(outPath, result.text!);
+    } else {
+      writeBinaryFileAtomic(outPath, result.bytes!);
+    }
+    process.stderr.write(`${formatExportSummary(result, file)} → ${outPath}\n`);
+    return outPath;
+  };
 
   if (stopOnError) {
+    await pMap(files, renderOne, { concurrency, continueOnError: false });
     process.stderr.write(`✓ ${files.length} file(s) exported.\n`);
     return 0;
   }
 
+  const results = await pMap(files, renderOne, { concurrency, continueOnError: true });
   let succeeded = 0;
   let failed = 0;
   const failures: string[] = [];
   for (let i = 0; i < results.length; i++) {
-    const r = results[i] as { ok: boolean; error?: Error };
+    const r = results[i]!;
     if (r.ok) succeeded++;
     else {
       failed++;
-      failures.push(`  ✗ ${files[i]}: ${r.error?.message ?? "unknown error"}`);
+      failures.push(`  ✗ ${files[i]}: ${r.error.message}`);
     }
   }
   process.stderr.write(`\nbd batch: ${succeeded} succeeded, ${failed} failed.\n`);
