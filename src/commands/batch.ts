@@ -3,8 +3,12 @@
 // `bd batch <paths...>` — render many diagram sources in parallel and write
 // each result to --out-dir, preserving the source's relative path layout.
 // One /v1/export request per file; the server is unchanged.
+//
+// Symlinked source files are rejected (via readDiagramFile -> assertNotSymlink)
+// for the same reason as `bd export`: a symlinked input could trick the CLI
+// into uploading the contents of an unrelated sensitive file to the API.
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { ApiClient } from "../lib/api-client.js";
 import { getBoolFlag, getStringFlag, parseArgs } from "../lib/args.js";
@@ -12,7 +16,14 @@ import { resolveConfig } from "../lib/config.js";
 import { pMap } from "../lib/concurrency.js";
 import { exportOne, formatExportSummary, type OutputFormat } from "../lib/exporter.js";
 import { expandDiagramPaths } from "../lib/fileset.js";
-import { inferFormatFromPath, writeFileAtomic } from "../lib/io.js";
+import {
+  assertWithinRoot,
+  inferFormatFromPath,
+  readDiagramFile,
+  UnsafePathError,
+  writeBinaryFileAtomic,
+  writeFileAtomic,
+} from "../lib/io.js";
 
 const DEFAULT_CONCURRENCY = 4;
 
@@ -56,6 +67,20 @@ export async function runBatchCommand(argv: string[]): Promise<number> {
   }
   const theme = getStringFlag(parsed, "theme");
   const outDir = getStringFlag(parsed, "out-dir") ?? ".";
+  // Containment check: --out-dir MUST resolve within cwd. Done once at
+  // command entry rather than per-file. Defends against `--out-dir=../../etc`.
+  const outDirAbs = path.resolve(outDir);
+  try {
+    assertWithinRoot(outDirAbs, process.cwd());
+  } catch (err) {
+    if (err instanceof UnsafePathError) {
+      process.stderr.write(
+        `error: --out-dir resolves outside the cwd: ${outDirAbs}\n`,
+      );
+      return 1;
+    }
+    throw err;
+  }
   const concurrency = parsePositiveInt(getStringFlag(parsed, "concurrency"), DEFAULT_CONCURRENCY);
   if (concurrency === null) {
     process.stderr.write("error: --concurrency must be a positive integer.\n");
@@ -73,7 +98,7 @@ export async function runBatchCommand(argv: string[]): Promise<number> {
   const results = await pMap(
     files,
     async (file) => {
-      const source = readFileSync(file, "utf8").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+      const source = readDiagramFile(file);
       const sourceFormat = inferFormatFromPath(file, undefined);
       const result = await exportOne(client, {
         source,
@@ -86,10 +111,7 @@ export async function runBatchCommand(argv: string[]): Promise<number> {
       if (result.format === "svg") {
         writeFileAtomic(outPath, result.text!);
       } else {
-        const tmp = `${outPath}.tmp.${process.pid}.${Date.now()}`;
-        const { writeFileSync, renameSync } = await import("node:fs");
-        writeFileSync(tmp, result.bytes!);
-        renameSync(tmp, outPath);
+        writeBinaryFileAtomic(outPath, result.bytes!);
       }
       process.stderr.write(`${formatExportSummary(result, file)} → ${outPath}\n`);
       return outPath;

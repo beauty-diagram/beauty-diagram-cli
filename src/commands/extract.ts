@@ -9,14 +9,14 @@
 // unchanged. The marker syntax is `<!-- bd:img hash=… -->` which survives
 // every Markdown renderer we care about.
 
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { ApiClient } from "../lib/api-client.js";
 import { getBoolFlag, getStringFlag, parseArgs } from "../lib/args.js";
 import { resolveConfig } from "../lib/config.js";
 import { pMap } from "../lib/concurrency.js";
 import { exportOne } from "../lib/exporter.js";
-import { writeFileAtomic } from "../lib/io.js";
+import { assertWithinRoot, writeFileAtomic } from "../lib/io.js";
 import {
   applyImageMarkers,
   computeBlockHash,
@@ -93,6 +93,23 @@ export async function runExtractCommand(argv: string[]): Promise<number> {
     const mdDir = path.dirname(path.resolve(mdPath));
     const assetsAbs = path.resolve(mdDir, assetsDir);
 
+    // Containment: --assets-dir MUST resolve within either the markdown
+    // file's directory or cwd. Defends against `--assets-dir=../../etc/`.
+    // Checked once per doc since mdDir varies; the `--clean` codepath
+    // re-checks defensively via assetsRootAllowed below.
+    const cwd = process.cwd();
+    let assetsContained = false;
+    try { assertWithinRoot(assetsAbs, mdDir); assetsContained = true; } catch { /* try cwd */ }
+    if (!assetsContained) {
+      try { assertWithinRoot(assetsAbs, cwd); assetsContained = true; } catch { /* fall through */ }
+    }
+    if (!assetsContained) {
+      process.stderr.write(
+        `error: --assets-dir resolves outside the markdown file's directory and the cwd: ${assetsAbs}\n`,
+      );
+      return 1;
+    }
+
     // Determine which blocks already have an up-to-date marker.
     const blockPlan = blocks.map((block, index) => {
       const hash = computeBlockHash(block);
@@ -113,6 +130,12 @@ export async function runExtractCommand(argv: string[]): Promise<number> {
       `${mdPath}: ${blocks.length} block(s), ${toRender.length} to render, ${blockPlan.length - toRender.length} cached.\n`,
     );
 
+    // Per-doc atomicity contract: if any block render fails mid-doc, we do
+    // NOT rewrite the Markdown file (leaving the user's source untouched),
+    // AND we unlink any sibling SVGs newly written during this run. Cached
+    // SVGs from previous runs are kept. This avoids leaving the doc half-
+    // injected with a mix of stale and fresh sidecars.
+    const newlyWritten: string[] = [];
     let renderError: Error | null = null;
     const renderResults = await pMap(
       toRender,
@@ -126,16 +149,21 @@ export async function runExtractCommand(argv: string[]): Promise<number> {
         if (!dryRun) {
           mkdirSync(assetsAbs, { recursive: true });
           writeFileAtomic(item.imageAbs, result.text!);
+          newlyWritten.push(item.imageAbs);
         }
         return item;
       },
       { concurrency, continueOnError: false },
     ).catch((err: Error) => {
       renderError = err;
-      return [] as never[];
+      return [];
     });
 
     if (renderError) {
+      // Best-effort cleanup of newly-written sidecars.
+      for (const p of newlyWritten) {
+        try { unlinkSync(p); } catch { /* swallow */ }
+      }
       process.stderr.write(`${mdPath}: ${(renderError as Error).message}\n`);
       exitCode = 1;
       continue;
@@ -153,6 +181,17 @@ export async function runExtractCommand(argv: string[]): Promise<number> {
 
     let cleaned = 0;
     if (cleanOrphans) {
+      // Defence in depth: refuse to delete from a directory that escaped
+      // both safe roots, even though the entry-level check above already
+      // covers this. Cheap insurance against future refactors.
+      const cleanAllowed =
+        canContain(assetsAbs, mdDir) || canContain(assetsAbs, cwd);
+      if (!cleanAllowed) {
+        process.stderr.write(
+          `error: --clean refused: assets dir is outside allowed roots: ${assetsAbs}\n`,
+        );
+        return 1;
+      }
       cleaned = removeOrphanAssets(assetsAbs, docSlug, blockPlan.map((p) => p.filename), dryRun);
     }
 
@@ -197,6 +236,10 @@ function hasMarkerAfter(text: string, fromOffset: number, expectedHash: string):
   return !!m && m[2] === expectedHash;
 }
 
+function canContain(targetAbs: string, rootAbs: string): boolean {
+  try { assertWithinRoot(targetAbs, rootAbs); return true; } catch { return false; }
+}
+
 function removeOrphanAssets(
   assetsAbs: string,
   docSlug: string,
@@ -204,7 +247,6 @@ function removeOrphanAssets(
   dryRun: boolean,
 ): number {
   if (!existsSync(assetsAbs)) return 0;
-  const { readdirSync } = require("node:fs") as typeof import("node:fs");
   const keep = new Set(keepFilenames);
   let removed = 0;
   for (const name of readdirSync(assetsAbs)) {
