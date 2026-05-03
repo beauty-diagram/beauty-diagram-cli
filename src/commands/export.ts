@@ -1,27 +1,23 @@
 // packages/cli/src/commands/export.ts
 //
 // `bd export` — POSTs to /v1/export and writes the resulting file.
-//
-// Output format is selected with `--format svg|png` (default svg) and
-// matches the README. The source format is auto-detected from the file
-// extension (`.mmd` / `.puml` etc.) and can be overridden with
-// `--source-format mermaid|plantuml` for stdin pipelines.
-//
-// PNG resolution is requested via `--scale 1|2|4`. The server caps the
-// effective scale by plan tier — values above the cap are silently clamped
-// and the response carries `X-BD-Scale-Clamped: true` so we can warn.
+// Thin wrapper over src/lib/exporter.ts.
 
 import { ApiClient } from "../lib/api-client.js";
 import { getStringFlag, parseArgs } from "../lib/args.js";
 import { resolveConfig } from "../lib/config.js";
+import {
+  exportOne,
+  formatExportSummary,
+  isScaleClamped,
+  type OutputFormat,
+} from "../lib/exporter.js";
 import {
   inferFormatFromPath,
   readSourceFromFileOrStdin,
   writeBinaryOutput,
   writeOutput,
 } from "../lib/io.js";
-
-type OutputFormat = "svg" | "png";
 
 function parseOutputFormat(raw: string | undefined): OutputFormat | null {
   if (!raw) return "svg";
@@ -42,10 +38,7 @@ export async function runExportCommand(argv: string[]): Promise<number> {
   const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
 
   const source = readSourceFromFileOrStdin(file);
-  const sourceFormat = inferFormatFromPath(
-    file,
-    getStringFlag(parsed, "source-format"),
-  );
+  const sourceFormat = inferFormatFromPath(file, getStringFlag(parsed, "source-format"));
 
   const fmt = parseOutputFormat(getStringFlag(parsed, "format"));
   if (fmt === null) {
@@ -64,42 +57,25 @@ export async function runExportCommand(argv: string[]): Promise<number> {
     process.stderr.write("warn: --scale is ignored for SVG output.\n");
   }
 
-  const requestBody = {
+  const result = await exportOne(client, {
     source,
     sourceFormat,
     format: fmt,
     ...(theme ? { theme } : {}),
     ...(fmt === "png" && scale !== null ? { scale } : {}),
-  };
+  });
 
-  if (fmt === "svg") {
-    const { body, headers } = await client.postRaw("/v1/export", requestBody);
-    writeOutput(body, out);
-    printSummary(headers, "svg");
-    return 0;
+  if (result.format === "svg") {
+    writeOutput(result.text!, out);
+  } else {
+    writeBinaryOutput(result.bytes!, out);
   }
 
-  const { body, headers } = await client.postBinary("/v1/export", requestBody);
-  writeBinaryOutput(body, out);
-  printSummary(headers, "png");
-  return 0;
-}
-
-function printSummary(headers: Record<string, string>, fmt: OutputFormat) {
-  const diagramType = headers["x-bd-diagram-type"] ?? fmt;
-  const plan = headers["x-bd-quota-plan"] ?? "unknown";
-  const used = headers["x-bd-quota-used"] ?? "?";
-  const limit = headers["x-bd-quota-limit"] ?? "?";
-  const watermark = headers["x-bd-watermark"] === "true" ? " (watermarked)" : "";
-  const scale = headers["x-bd-scale"];
-  const clamped = headers["x-bd-scale-clamped"] === "true";
-  const scaleSuffix = scale ? `@${scale}x` : "";
-  process.stderr.write(
-    `✓ exported ${fmt}${scaleSuffix} (${diagramType})${watermark}. Quota: ${used}/${limit} (${plan})\n`,
-  );
-  if (clamped) {
+  process.stderr.write(`${formatExportSummary(result)}\n`);
+  if (isScaleClamped(result)) {
     process.stderr.write(
-      `  note: requested scale was clamped to ${scale}x by your plan. Upgrade for higher resolutions.\n`,
+      `  note: requested scale was clamped to ${result.headers["x-bd-scale"]}x by your plan. Upgrade for higher resolutions.\n`,
     );
   }
+  return 0;
 }

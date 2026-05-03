@@ -11,8 +11,10 @@
 
 import { runAiCommand } from "./commands/ai.js";
 import { runAuthCommand } from "./commands/auth.js";
+import { runBatchCommand } from "./commands/batch.js";
 import { runBeautifyCommand } from "./commands/beautify.js";
 import { runExportCommand } from "./commands/export.js";
+import { runExtractCommand } from "./commands/extract.js";
 import { runShareCommand } from "./commands/share.js";
 import { runThemesCommand } from "./commands/themes.js";
 import { runUsageCommand } from "./commands/usage.js";
@@ -30,6 +32,10 @@ Commands:
   themes                           List available themes
   beautify <file> [--theme T] [--out O] [--format mermaid|plantuml]
   export   <file> [--theme T] [--format svg|png] [--out O]
+  batch    <paths...> [--out-dir D] [--format svg|png] [--theme T] [--concurrency N] [--stop-on-error]
+                                   Render many diagram files in parallel
+  extract  <markdown...> [--assets-dir D] [--theme T] [--concurrency N] [--dry-run] [--clean]
+                                   Render Mermaid/PlantUML blocks inside Markdown to sidecar SVGs
   share    <file> [--title T] [--theme T]
   ai generate "<prompt>" [--out O] [--hint H]
                                    Generate Mermaid source via AI (paid plans only)
@@ -68,6 +74,10 @@ async function main(argv: string[]): Promise<number> {
       return runBeautifyCommand(rest);
     case "export":
       return runExportCommand(rest);
+    case "batch":
+      return runBatchCommand(rest);
+    case "extract":
+      return runExtractCommand(rest);
     case "share":
       return runShareCommand(rest);
     case "usage":

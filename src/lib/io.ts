@@ -21,7 +21,7 @@ export class UnsafePathError extends Error {
  * traversal is not needed because an attacker who can plant a symlink
  * anywhere on the path can also just put the symlink at the leaf.
  */
-function assertNotSymlink(resolvedPath: string): void {
+export function assertNotSymlink(resolvedPath: string): void {
   let stat;
   try {
     stat = lstatSync(resolvedPath);
@@ -34,6 +34,26 @@ function assertNotSymlink(resolvedPath: string): void {
   if (stat.isSymbolicLink()) {
     throw new UnsafePathError(
       `refusing to read through a symbolic link: ${resolvedPath}`,
+    );
+  }
+}
+
+/**
+ * Assert that `targetAbs` is contained within `rootAbs`. Both paths are
+ * expected to be absolute and already resolved. Throws `UnsafePathError`
+ * when the target escapes the root via `..` segments or is on a different
+ * absolute root.
+ *
+ * Used by `bd extract --assets-dir` and `bd batch --out-dir` to prevent
+ * a hostile or buggy invocation from writing rendered SVGs/PNGs outside
+ * the project tree (e.g. `--out-dir=../../etc/`).
+ */
+export function assertWithinRoot(targetAbs: string, rootAbs: string): void {
+  const rel = path.relative(rootAbs, targetAbs);
+  if (rel === "") return;
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw new UnsafePathError(
+      `path resolves outside of allowed root: ${targetAbs}`,
     );
   }
 }
@@ -55,11 +75,24 @@ export function readSourceFromFileOrStdin(filePath?: string): string {
   return normalizeSource(buf.toString("utf8"));
 }
 
+/**
+ * Read a diagram source file, applying the same symlink rejection and
+ * BOM/CRLF normalization as `readSourceFromFileOrStdin`. Used by `bd batch`
+ * which doesn't support stdin (it processes many files) but must still
+ * refuse symlinked sources for the same reason as `bd export`: a symlink
+ * could trick the CLI into uploading sensitive content to the API.
+ */
+export function readDiagramFile(filePath: string): string {
+  const resolved = path.resolve(filePath);
+  assertNotSymlink(resolved);
+  return normalizeSource(readFileSync(resolved, "utf8"));
+}
+
 // Editors on Windows / BOM-emitting tools leave a UTF-8 BOM at file start
 // and write CRLF line endings. Both reach Mermaid / PlantUML parsers as
 // part of node labels and silently make rendered text disappear.
 // Normalize at the file-read boundary so every CLI command is immune.
-function normalizeSource(text: string): string {
+export function normalizeSource(text: string): string {
   return text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
 }
 
@@ -78,6 +111,18 @@ export function writeFileAtomic(targetPath: string, contents: string): void {
   const resolved = path.resolve(targetPath);
   const tmp = `${resolved}.tmp.${process.pid}.${Date.now()}`;
   writeFileSync(tmp, contents, "utf8");
+  renameSync(tmp, resolved);
+}
+
+/**
+ * Binary counterpart of `writeFileAtomic`. Writes bytes to a sibling tmp
+ * file then renames into place so a partial write never leaves a corrupted
+ * file at `targetPath`.
+ */
+export function writeBinaryFileAtomic(targetPath: string, bytes: Uint8Array): void {
+  const resolved = path.resolve(targetPath);
+  const tmp = `${resolved}.tmp.${process.pid}.${Date.now()}`;
+  writeFileSync(tmp, bytes);
   renameSync(tmp, resolved);
 }
 
@@ -100,8 +145,5 @@ export function writeBinaryOutput(
     process.stdout.write(bytes);
     return;
   }
-  const resolved = path.resolve(outPath);
-  const tmp = `${resolved}.tmp.${process.pid}.${Date.now()}`;
-  writeFileSync(tmp, bytes);
-  renameSync(tmp, resolved);
+  writeBinaryFileAtomic(outPath, bytes);
 }

@@ -80,6 +80,41 @@ url=$(bd share flow.mmd --title "Release flow")
 echo "Diagram: $url"
 ```
 
+## Batch render
+
+Render every diagram in a directory in parallel:
+
+```bash
+bd batch ./diagrams --out-dir ./svg
+bd batch "docs/**/*.mmd" --format png --concurrency 8
+```
+
+Each file becomes one `/v1/export` request — failures are reported per-file
+and the whole batch keeps going (use `--stop-on-error` to abort on the first
+failure). The source folder layout is preserved under `--out-dir`.
+
+## Embed diagrams in Markdown
+
+`bd extract` finds every ```` ```mermaid ```` / ```` ```plantuml ```` fenced
+block in your Markdown files, renders them to sidecar SVGs, and injects an
+image reference just below each block. Re-running is idempotent —
+content-hashed filenames mean unchanged blocks are skipped.
+
+```bash
+bd extract README.md
+bd extract docs/*.md --assets-dir ./img --concurrency 4
+bd extract README.md --dry-run        # preview without writing
+bd extract README.md --clean          # also delete orphaned SVGs
+```
+
+The injected block looks like this and is re-recognized on subsequent runs:
+
+```
+<!-- bd:img hash=a3f9c2b1 -->
+![Diagram 1](./assets/readme-a3f9c2b1.svg)
+<!-- /bd:img -->
+```
+
 ## Configuration precedence
 
 For each request, the CLI resolves the API key in this order:
