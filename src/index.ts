@@ -13,12 +13,16 @@ import { runAiCommand } from "./commands/ai.js";
 import { runAuthCommand } from "./commands/auth.js";
 import { runBatchCommand } from "./commands/batch.js";
 import { runBeautifyCommand } from "./commands/beautify.js";
+import { runEmbedUrl } from "./commands/embed-url.js";
 import { runExportCommand } from "./commands/export.js";
 import { runExtractCommand } from "./commands/extract.js";
 import { runShareCommand } from "./commands/share.js";
 import { runThemesCommand } from "./commands/themes.js";
 import { runUsageCommand } from "./commands/usage.js";
-import { isApiError } from "./lib/api-client.js";
+import { ApiClient, isApiError } from "./lib/api-client.js";
+import { getStringFlag, getBoolFlag, parseArgs } from "./lib/args.js";
+import { resolveConfig } from "./lib/config.js";
+import { readSourceFromFileOrStdin, inferFormatFromPath } from "./lib/io.js";
 
 const HELP = `bd — Beauty Diagram CLI
 
@@ -37,6 +41,8 @@ Commands:
   extract  <markdown...> [--assets-dir D] [--theme T] [--concurrency N] [--dry-run] [--clean]
                                    Render Mermaid/PlantUML blocks inside Markdown to sidecar SVGs
   share    <file> [--title T] [--theme T]
+  embed-url <file> [--theme T] [--share]
+                                   Print embed URL(s) for a diagram source
   ai generate "<prompt>" [--out O] [--hint H]
                                    Generate Mermaid source via AI (paid plans only)
   usage                            Show plan, export and AI counters
@@ -80,6 +86,46 @@ async function main(argv: string[]): Promise<number> {
       return runExtractCommand(rest);
     case "share":
       return runShareCommand(rest);
+    case "embed-url": {
+      const parsed = parseArgs(rest);
+      const file = parsed.positional[0];
+      const cfg = resolveConfig(getStringFlag(parsed, "api-key"), getStringFlag(parsed, "base-url"));
+      const sourceText = readSourceFromFileOrStdin(file);
+      const theme = getStringFlag(parsed, "theme");
+      const share = getBoolFlag(parsed, "share");
+
+      type ShareResponse = {
+        shareToken: string;
+        sourceFormat?: string;
+      };
+
+      await runEmbedUrl({
+        file: file ?? "-",
+        sourceText,
+        theme,
+        share,
+        apiBaseUrl: cfg.baseUrl,
+        runShare: async ({ file: f, sourceText: src }) => {
+          if (!cfg.apiKey) {
+            const signUpUrl = new URL("/auth/signup", cfg.baseUrl).toString();
+            process.stderr.write(
+              "error: `bd embed-url --share` requires an API key. Run `bd auth login` first.\n",
+            );
+            process.stderr.write(`  Sign up: ${signUpUrl}\n`);
+            throw new Error("api key required for --share");
+          }
+          const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
+          const sourceFormat = inferFormatFromPath(f, undefined);
+          const res = await client.postJson<ShareResponse>("/v1/share", {
+            source: src,
+            sourceFormat,
+          });
+          return { shareToken: res.shareToken };
+        },
+        log: (line) => process.stdout.write(`${line}\n`),
+      });
+      return 0;
+    }
     case "usage":
       return runUsageCommand(rest);
     case "ai":
