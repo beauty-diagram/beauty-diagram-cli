@@ -9,12 +9,34 @@ import type { ApiClient } from "./api-client.js";
 export type SourceFormat = "mermaid" | "plantuml";
 export type OutputFormat = "svg" | "png";
 
+// Quality tiers mirror the web export popover (standard / high / max).
+// Internally each maps to the API's numeric `scale` (1× / 2× / 4×) which
+// the server still clamps by plan tier.
+export type ExportQuality = "standard" | "high" | "max";
+
+export const QUALITY_SCALE: Record<ExportQuality, number> = {
+  standard: 1,
+  high: 2,
+  max: 4,
+};
+
+const SCALE_TO_QUALITY: Record<number, ExportQuality> = {
+  1: "standard",
+  2: "high",
+  4: "max",
+};
+
+export function scaleToQuality(scale: number | undefined): ExportQuality | null {
+  if (scale === undefined) return null;
+  return SCALE_TO_QUALITY[scale] ?? null;
+}
+
 export type ExportOpts = {
   source: string;
   sourceFormat: SourceFormat;
   format: OutputFormat;
   theme?: string;
-  scale?: number;
+  quality?: ExportQuality;
 };
 
 export type ExportResult = {
@@ -30,8 +52,8 @@ export function buildExportRequest(opts: ExportOpts): Record<string, unknown> {
     sourceFormat: opts.sourceFormat,
     format: opts.format,
     ...(opts.theme ? { theme: opts.theme } : {}),
-    ...(opts.format === "png" && typeof opts.scale === "number"
-      ? { scale: opts.scale }
+    ...(opts.format === "png" && opts.quality
+      ? { scale: QUALITY_SCALE[opts.quality] }
       : {}),
   };
 }

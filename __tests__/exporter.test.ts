@@ -22,13 +22,24 @@ describe("buildExportRequest", () => {
     expect(body).toMatchObject({ theme: "neon" });
   });
 
-  it("includes scale only when format is png", () => {
-    const png = buildExportRequest({
-      source: "x", sourceFormat: "mermaid", format: "png", scale: 2,
+  it("maps quality to scale only when format is png", () => {
+    const standard = buildExportRequest({
+      source: "x", sourceFormat: "mermaid", format: "png", quality: "standard",
     });
-    expect(png).toMatchObject({ scale: 2 });
+    expect(standard).toMatchObject({ scale: 1 });
+
+    const high = buildExportRequest({
+      source: "x", sourceFormat: "mermaid", format: "png", quality: "high",
+    });
+    expect(high).toMatchObject({ scale: 2 });
+
+    const max = buildExportRequest({
+      source: "x", sourceFormat: "mermaid", format: "png", quality: "max",
+    });
+    expect(max).toMatchObject({ scale: 4 });
+
     const svg = buildExportRequest({
-      source: "x", sourceFormat: "mermaid", format: "svg", scale: 2,
+      source: "x", sourceFormat: "mermaid", format: "svg", quality: "high",
     });
     expect(svg).not.toHaveProperty("scale");
   });

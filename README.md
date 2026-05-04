@@ -51,7 +51,7 @@ Pick the smallest scope set that covers your workflow.
 ```bash
 bd themes
 bd beautify flow.mmd [--theme modern] [--out flow.svg]
-bd export   flow.mmd [--theme modern] [--format svg|png] [--scale 1|2|4] [--out flow.svg]
+bd export   flow.mmd [--theme modern] [--format svg|png] [--quality standard|high|max] [--out flow.svg]
 bd batch    <paths...>     [--out-dir DIR] [--format svg|png] [--concurrency N] [--stop-on-error]
 bd extract  <markdown...>  [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
 bd share    flow.mmd [--title "Release flow"] [--theme modern]
@@ -59,11 +59,12 @@ bd ai generate "<prompt>" [--hint flowchart|sequence|...] [--out flow.mmd]
 bd usage
 ```
 
-`bd export --format png --scale 4` requests a 4x PNG. The server caps the
-effective scale by plan tier (anonymous / free = 1x, pro = 2x, premium = 4x);
-when clamping happens the CLI prints a one-line note pointing at the upgrade
-path. CJK labels in PNGs render as tofu boxes today — use `--format svg` for
-diagrams with Chinese / Japanese / Korean text.
+`bd export --format png --quality max` requests a max-tier (4×) PNG. Quality
+maps to internal scale (`standard` = 1×, `high` = 2×, `max` = 4×) and the
+server caps the effective tier by plan (anonymous / free = standard, pro =
+high, premium = max); when clamping happens the CLI prints a one-line note
+pointing at the upgrade path. CJK labels in PNGs render as tofu boxes today
+— use `--format svg` for diagrams with Chinese / Japanese / Korean text.
 
 ### File handling
 
@@ -152,7 +153,7 @@ plus message to stderr. Common codes:
 | `parse_failed` | Source did not parse as the declared format. |
 | `quota_exhausted` | Plan limit reached for this period. |
 | `rate_limited` | Anonymous IP bucket is full — wait or sign in. |
-| `output_too_large` | Rasterized PNG exceeds the 8192 px ceiling. Lower `--scale` or simplify the diagram. |
+| `output_too_large` | Rasterized PNG exceeds the 8192 px ceiling. Lower `--quality` or simplify the diagram. |
 | `not_yet_supported` | Reserved for endpoints that ship in later phases. |
 
 ## Privacy

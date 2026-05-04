@@ -10,6 +10,8 @@ import {
   exportOne,
   formatExportSummary,
   isScaleClamped,
+  scaleToQuality,
+  type ExportQuality,
   type OutputFormat,
 } from "../lib/exporter.js";
 import {
@@ -25,10 +27,13 @@ function parseOutputFormat(raw: string | undefined): OutputFormat | null {
   return null;
 }
 
-function parseScale(raw: string | undefined): number | null {
+const QUALITY_VALUES: readonly ExportQuality[] = ["standard", "high", "max"];
+
+function parseQuality(raw: string | undefined): ExportQuality | null | "invalid" {
   if (raw === undefined) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : NaN;
+  return (QUALITY_VALUES as readonly string[]).includes(raw)
+    ? (raw as ExportQuality)
+    : "invalid";
 }
 
 export async function runExportCommand(argv: string[]): Promise<number> {
@@ -48,13 +53,13 @@ export async function runExportCommand(argv: string[]): Promise<number> {
   const theme = getStringFlag(parsed, "theme");
   const out = getStringFlag(parsed, "out");
 
-  const scale = parseScale(getStringFlag(parsed, "scale"));
-  if (Number.isNaN(scale)) {
-    process.stderr.write("error: --scale must be a positive number.\n");
+  const quality = parseQuality(getStringFlag(parsed, "quality"));
+  if (quality === "invalid") {
+    process.stderr.write("error: --quality must be 'standard', 'high', or 'max'.\n");
     return 1;
   }
-  if (scale !== null && fmt === "svg") {
-    process.stderr.write("warn: --scale is ignored for SVG output.\n");
+  if (quality !== null && fmt === "svg") {
+    process.stderr.write("warn: --quality is ignored for SVG output.\n");
   }
 
   const result = await exportOne(client, {
@@ -62,7 +67,7 @@ export async function runExportCommand(argv: string[]): Promise<number> {
     sourceFormat,
     format: fmt,
     ...(theme ? { theme } : {}),
-    ...(fmt === "png" && scale !== null ? { scale } : {}),
+    ...(fmt === "png" && quality !== null ? { quality } : {}),
   });
 
   if (result.format === "svg") {
@@ -73,8 +78,10 @@ export async function runExportCommand(argv: string[]): Promise<number> {
 
   process.stderr.write(`${formatExportSummary(result)}\n`);
   if (isScaleClamped(result)) {
+    const cappedScale = Number(result.headers["x-bd-scale"]);
+    const cappedQuality = scaleToQuality(cappedScale) ?? `${cappedScale}x`;
     process.stderr.write(
-      `  note: requested scale was clamped to ${result.headers["x-bd-scale"]}x by your plan. Upgrade for higher resolutions.\n`,
+      `  note: requested quality was clamped to '${cappedQuality}' by your plan. Upgrade for higher tiers.\n`,
     );
   }
   return 0;
