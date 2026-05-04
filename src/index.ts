@@ -16,7 +16,7 @@ import { runBeautifyCommand } from "./commands/beautify.js";
 import { runEmbedUrl } from "./commands/embed-url.js";
 import { runExportCommand } from "./commands/export.js";
 import { runExtractCommand } from "./commands/extract.js";
-import { runShareCommand } from "./commands/share.js";
+import { requestShare, runShareCommand } from "./commands/share.js";
 import { runThemesCommand } from "./commands/themes.js";
 import { runUsageCommand } from "./commands/usage.js";
 import { ApiClient, isApiError } from "./lib/api-client.js";
@@ -94,11 +94,6 @@ async function main(argv: string[]): Promise<number> {
       const theme = getStringFlag(parsed, "theme");
       const share = getBoolFlag(parsed, "share");
 
-      type ShareResponse = {
-        shareToken: string;
-        sourceFormat?: string;
-      };
-
       await runEmbedUrl({
         file: file ?? "-",
         sourceText,
@@ -116,10 +111,7 @@ async function main(argv: string[]): Promise<number> {
           }
           const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
           const sourceFormat = inferFormatFromPath(f, undefined);
-          const res = await client.postJson<ShareResponse>("/v1/share", {
-            source: src,
-            sourceFormat,
-          });
+          const res = await requestShare({ client, sourceText: src, sourceFormat });
           return { shareToken: res.shareToken };
         },
         log: (line) => process.stdout.write(`${line}\n`),

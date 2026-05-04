@@ -5,7 +5,7 @@ import { getStringFlag, parseArgs } from "../lib/args.js";
 import { resolveConfig } from "../lib/config.js";
 import { inferFormatFromPath, readSourceFromFileOrStdin } from "../lib/io.js";
 
-type ShareResponse = {
+export type ShareResponse = {
   ok: true;
   diagramId: string;
   shareToken: string;
@@ -14,6 +14,32 @@ type ShareResponse = {
   title: string | null;
   diagramType: string;
 };
+
+export interface RequestShareInput {
+  client: ApiClient;
+  sourceText: string;
+  title?: string;
+  sourceFormat?: string;
+  theme?: string;
+}
+
+/**
+ * Posts to /v1/share and returns the parsed response.
+ *
+ * Performs the share API call without any UI side effects (no console writes).
+ * Used by `bd share` (which then prints the share page URL after protocol
+ * validation) and `bd embed-url --share` (which builds an embed SVG URL from
+ * the returned shareToken).
+ */
+export async function requestShare(input: RequestShareInput): Promise<ShareResponse> {
+  const { client, sourceText, title, sourceFormat, theme } = input;
+  return client.postJson<ShareResponse>("/v1/share", {
+    source: sourceText,
+    ...(sourceFormat ? { sourceFormat } : {}),
+    ...(title ? { title } : {}),
+    ...(theme ? { theme } : {}),
+  });
+}
 
 export async function runShareCommand(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
@@ -29,17 +55,12 @@ export async function runShareCommand(argv: string[]): Promise<number> {
   }
   const client = new ApiClient(cfg.baseUrl, cfg.apiKey);
 
-  const source = readSourceFromFileOrStdin(file);
+  const sourceText = readSourceFromFileOrStdin(file);
   const sourceFormat = inferFormatFromPath(file, getStringFlag(parsed, "format"));
   const title = getStringFlag(parsed, "title");
   const theme = getStringFlag(parsed, "theme");
 
-  const res = await client.postJson<ShareResponse>("/v1/share", {
-    source,
-    sourceFormat,
-    ...(title ? { title } : {}),
-    ...(theme ? { theme } : {}),
-  });
+  const res = await requestShare({ client, sourceText, title, sourceFormat, theme });
 
   // Resolve the share URL relative to the configured base URL, then validate
   // it before printing. A compromised or misconfigured server could otherwise

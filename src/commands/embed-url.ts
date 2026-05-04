@@ -16,9 +16,14 @@ export interface EmbedUrlOptions {
   log: (line: string) => void;
 }
 
+const SHARE_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export async function runEmbedUrl(opts: EmbedUrlOptions): Promise<void> {
   if (opts.share) {
     const result = await opts.runShare({ file: opts.file, sourceText: opts.sourceText });
+    if (!SHARE_TOKEN_PATTERN.test(result.shareToken)) {
+      throw new Error(`Invalid share token format: ${JSON.stringify(result.shareToken)}`);
+    }
     opts.log(`${opts.apiBaseUrl}/v1/share/${result.shareToken}.svg`);
     return;
   }

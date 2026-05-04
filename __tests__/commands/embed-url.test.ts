@@ -52,6 +52,22 @@ describe("bd embed-url", () => {
     expect(output).not.toContain("Saved share embed (clean");
   });
 
+  it("rejects share tokens that contain path-injection characters", async () => {
+    const log = vi.fn();
+    const runShare = vi.fn().mockResolvedValue({ shareToken: "abc/../etc/passwd" });
+    await expect(
+      runEmbedUrl({
+        file: "/dev/stdin",
+        sourceText: "graph TD\n  A-->B",
+        theme: undefined,
+        share: true,
+        apiBaseUrl: "https://api.beauty-diagram.com",
+        runShare,
+        log,
+      }),
+    ).rejects.toThrow(/share token/i);
+  });
+
   it("base64-encodes the source for inline URL", async () => {
     const log = vi.fn();
     await runEmbedUrl({
