@@ -50,11 +50,12 @@ Pick the smallest scope set that covers your workflow.
 
 ```bash
 bd themes
-bd beautify flow.mmd [--theme modern] [--out flow.svg]
-bd export   flow.mmd [--theme modern] [--format svg|png] [--quality standard|high|max] [--out flow.svg]
-bd batch    <paths...>     [--out-dir DIR] [--format svg|png] [--concurrency N] [--stop-on-error]
-bd extract  <markdown...>  [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
-bd share    flow.mmd [--title "Release flow"] [--theme modern]
+bd beautify   flow.mmd [--theme modern] [--out flow.svg]
+bd export     flow.mmd [--theme modern] [--format svg|png] [--quality standard|high|max] [--out flow.svg]
+bd batch      <paths...>     [--out-dir DIR] [--format svg|png] [--concurrency N] [--stop-on-error]
+bd extract    <markdown...>  [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
+bd share      flow.mmd [--title "Release flow"] [--theme modern]
+bd embed-url  flow.mmd [--theme modern] [--share]
 bd ai generate "<prompt>" [--hint flowchart|sequence|...] [--out flow.mmd]
 bd usage
 ```
@@ -127,6 +128,39 @@ The injected block looks like this and is recognized on subsequent runs:
 - `--assets-dir` defaults to `./assets/` next to the Markdown file. It must resolve inside either the Markdown's directory or the cwd — paths that escape are rejected.
 - If a single block fails to render, sidecar SVGs already written for that document in the same run are cleaned up so the Markdown is never left half-injected.
 - Why sidecar files instead of inline `<svg>`? GitHub, GitLab, and most static-site renderers strip raw `<svg>` from Markdown for safety, so the only reliable embed is `![](path)`.
+
+## Embed URLs
+
+`bd embed-url` prints the embed URL(s) for a local diagram source without uploading or saving it.
+
+```bash
+# Print both the inline (anonymous, watermarked) URL and share-mode instructions
+bd embed-url ./architecture.mmd
+bd embed-url ./architecture.mmd --theme atlas
+
+# Save first as a share, then print only the clean share embed URL
+bd embed-url ./architecture.mmd --share
+```
+
+Default output (no `--share`) shows two things:
+
+```
+Inline embed (anonymous, watermarked):
+  https://api.beauty-diagram.com/v1/beautify.svg?source=<base64>&theme=atlas
+
+Saved share embed (clean output if you have Pro):
+  Run `bd share <file>` first, then use:
+  https://api.beauty-diagram.com/v1/share/<id>.svg
+```
+
+With `--share` the command runs `bd share` internally and prints only the share URL, so the output is pipe-friendly:
+
+```bash
+url=$(bd embed-url ./architecture.mmd --share)
+echo "![Architecture](${url})" >> README.md
+```
+
+The inline URL is always watermarked — it carries "Powered by Beauty Diagram" in the bottom-right corner regardless of plan or auth status. To get clean embed output, save the diagram with `bd share` (or `--share`) and use the resulting `/v1/share/<id>.svg` URL; watermark is removed for Pro and Premium plan owners.
 
 ## Configuration precedence
 
