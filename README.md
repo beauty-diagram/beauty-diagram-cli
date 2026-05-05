@@ -53,7 +53,7 @@ bd themes
 bd beautify   flow.mmd [--theme modern] [--out flow.svg]
 bd export     flow.mmd [--theme modern] [--format svg|png] [--quality standard|high|max] [--out flow.svg]
 bd batch      <paths...>     [--out-dir DIR] [--format svg|png] [--concurrency N] [--stop-on-error]
-bd extract    <markdown...>  [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
+bd extract    <markdown...>  [--theme T] [--assets-dir DIR] [--concurrency N] [--dry-run] [--clean]
 bd share      flow.mmd [--title "Release flow"] [--theme modern]
 bd embed-url  flow.mmd [--theme modern] [--share]
 bd ai generate "<prompt>" [--hint flowchart|sequence|...] [--out flow.mmd]
@@ -105,29 +105,64 @@ bd batch ./d --stop-on-error                 # abort on first failure (default: 
 ## Embed diagrams in Markdown
 
 `bd extract` finds every ```` ```mermaid ```` / ```` ```plantuml ```` fenced
-block in your Markdown files, renders each to a sidecar SVG, and injects an
-image reference just below the block. Re-running is **idempotent** —
-content-hashed filenames mean unchanged blocks are skipped.
+block in your Markdown files and injects an image reference just below each
+block. Re-running is **idempotent** — unchanged blocks are skipped.
+
+### Default: inline embed URLs (no API calls, no files)
 
 ```bash
 bd extract README.md
-bd extract docs/*.md --assets-dir ./img --concurrency 4
+bd extract docs/*.md --theme atlas
 bd extract README.md --dry-run        # preview without writing
-bd extract README.md --clean          # also delete orphaned SVGs left from old hashes
 ```
 
-The injected block looks like this and is recognized on subsequent runs:
+The default mode produces `<img>` URLs pointing at the anonymous
+`/v1/beautify.svg` endpoint. No API calls happen during `bd extract` itself —
+the URL encodes the source as a base64url query parameter and the browser
+(or GitHub's image proxy) fetches the diagram on demand.
+
+The injected block looks like:
+
+```
+<!-- bd:inline-img hash=a3f9c2b1 -->
+![Diagram 1](https://api.beauty-diagram.com/v1/beautify.svg?source=<base64>&theme=...)
+<!-- /bd:inline-img -->
+```
+
+Watermark policy: inline embed URLs always carry a "Powered by Beauty Diagram"
+watermark regardless of plan or auth status — they use the anonymous endpoint.
+
+Size cap: blocks whose UTF-8 source exceeds **5 KB** are skipped in inline
+mode (URL length limits). `bd extract` prints a per-block warning and exits
+with code 1 for partial failures. Use `--assets-dir` for large blocks.
+
+### Sidecar mode: local SVG files (Pro/Premium get watermark-free output)
+
+Pass `--assets-dir` to opt into the previous sidecar behaviour. Each block
+is rendered via `/v1/export`, written to a local SVG file, and an image
+reference is injected:
+
+```bash
+bd extract docs/*.md --assets-dir ./img --concurrency 4
+bd extract README.md --assets-dir ./img --clean   # also delete orphaned SVGs
+```
+
+The injected block looks like:
 
 ```
 <!-- bd:img hash=a3f9c2b1 -->
-![Diagram 1](./assets/readme-a3f9c2b1.svg)
+![Diagram 1](./img/readme-a3f9c2b1.svg)
 <!-- /bd:img -->
 ```
 
-- Markdown files with no diagram blocks are reported and skipped (exit 0).
-- `--assets-dir` defaults to `./assets/` next to the Markdown file. It must resolve inside either the Markdown's directory or the cwd — paths that escape are rejected.
-- If a single block fails to render, sidecar SVGs already written for that document in the same run are cleaned up so the Markdown is never left half-injected.
-- Why sidecar files instead of inline `<svg>`? GitHub, GitLab, and most static-site renderers strip raw `<svg>` from Markdown for safety, so the only reliable embed is `![](path)`.
+- `--assets-dir` must resolve inside either the Markdown's directory or the
+  cwd — paths that escape (e.g. `../../etc`) are rejected.
+- If a single block fails to render, SVGs already written for that document in
+  the same run are cleaned up so the Markdown is never left half-injected.
+- `/v1/export` quota applies (anonymous ~5/day, free ~30-50/month, pro/premium
+  higher). Use inline mode (the default) to avoid quota consumption.
+- `--concurrency` only applies in sidecar mode (inline needs no concurrency
+  control — it makes no API calls).
 
 ## Embed URLs
 

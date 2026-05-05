@@ -38,8 +38,9 @@ Commands:
   export   <file> [--theme T] [--format svg|png] [--out O]
   batch    <paths...> [--out-dir D] [--format svg|png] [--theme T] [--concurrency N] [--stop-on-error]
                                    Render many diagram files in parallel
-  extract  <markdown...> [--assets-dir D] [--theme T] [--concurrency N] [--dry-run] [--clean]
-                                   Render Mermaid/PlantUML blocks inside Markdown to sidecar SVGs
+  extract  <markdown...> [--theme T] [--assets-dir D] [--concurrency N] [--dry-run] [--clean]
+                                   Render Mermaid/PlantUML blocks inside Markdown to embed URLs (default)
+                                   or sidecar SVGs (with --assets-dir).
   share    <file> [--title T] [--theme T]
   embed-url <file> [--theme T] [--share]
                                    Print embed URL(s) for a diagram source
